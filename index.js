@@ -1,7 +1,9 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-require('dotenv').config();
+const Stripe = require('stripe')(process.env.STRIPE_KEY);
+console.log(process.env.STRIPE_KEY);
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -28,16 +30,32 @@ const announcements = client
   .db('facility-minderDB')
   .collection('announcements');
 const coupons = client.db('facility-minderDB').collection('coupons');
+const payments = client.db('facility-minderDB').collection('payments');
 
 // user data stored
 app.post('/users', async (req, res) => {
   const user = req.body;
+  const query = { email: user.email };
+  const existingUser = await users.findOne(query);
+  if (existingUser) {
+    return res.send({ massage: 'user already exists', insertedId: null });
+  }
   const result = await users.insertOne(user);
   res.send(result);
 });
 //  get all users data
 app.get('/users', async (req, res) => {
   const result = await users.find().toArray();
+  res.send(result);
+});
+// get specific user agreements
+app.get('/agreements', async (req, res) => {
+  let query = {};
+  if (req.query.email) {
+    query = { email: req.query.email };
+  }
+
+  const result = await agreements.find(query).toArray();
   res.send(result);
 });
 
@@ -105,10 +123,11 @@ app.get('/dashboard/announcements', async (req, res) => {
 });
 
 // Manage coupons
-app.patch('/dashboard/manage-coupons', async (req, res) => {
+app.put('/dashboard/manage-coupons/:id', async (req, res) => {
+  const id = req.params.id;
   const updatedCoupon = req.body;
-  const filter = { coupon: 'FACILITY20' };
-  const options = { upsert: true };
+  const filter = { _id: new ObjectId(id) };
+  const options = { upsert: false };
   const coupon = {
     $set: {
       coupon: updatedCoupon.coupon,
@@ -122,6 +141,43 @@ app.get('/dashboard/manage-coupons', async (req, res) => {
   res.send(result);
 });
 
+// Payment intent
+app.post('/create-payment-intent', async (req, res) => {
+  const { price } = req.body;
+  const amount = parseInt(price) * 100;
+  console.log(price);
+  const paymentIntent = await Stripe.paymentIntents.create({
+    amount: amount,
+    currency: 'usd',
+    payment_method_types: ['card'],
+  });
+  res.send({
+    clientSecret: paymentIntent.client_secret,
+  });
+});
+// Payment data
+app.post('/payments', async (req, res) => {
+  const payment = req.body;
+  const paymentResult = await payments.insertOne(payment);
+  const query = {
+    _id: {
+      $in: payment.bookingIds.map(id => new ObjectId(id)),
+    },
+  };
+  const deletedResult = await agreements.deleteMany(query);
+  res.send({ paymentResult, deletedResult });
+});
+// get payment data
+app.get('/payments', async (req, res) => {
+  const email = req.query.email;
+  const query = { email: email };
+  const result = await payments.find(query).toArray;
+  res.send(result);
+});
+// app.get('/request-agreements', async (req, res) => {
+//   const result = await payments.find().toArray;
+//   res.send(result);
+// });
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
