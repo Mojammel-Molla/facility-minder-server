@@ -10,8 +10,7 @@ const port = process.env.PORT || 5000;
 // middlewares
 app.use(cors());
 app.use(express.json());
-// facility - minderDB;
-// EMIMG0fIQ2J4Mfz5;
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.xljmjxf.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -24,6 +23,7 @@ const client = new MongoClient(uri, {
 });
 
 const users = client.db('facility-minderDB').collection('users');
+const complaints = client.db('facility-minderDB').collection('complaints');
 const apartments = client.db('facility-minderDB').collection('apartments');
 const agreements = client.db('facility-minderDB').collection('agreements');
 const announcements = client
@@ -31,6 +31,26 @@ const announcements = client
   .collection('announcements');
 const coupons = client.db('facility-minderDB').collection('coupons');
 const payments = client.db('facility-minderDB').collection('payments');
+
+// Post Jwt token
+app.post('/jwt', async (req, res) => {
+  const user = req.body;
+  const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+    expiresIn: '1hr',
+  });
+  res.send({ success: true });
+});
+// post members complaint to the admin
+app.post('/complaints', async (req, res) => {
+  const newComplaint = req.body;
+  const result = await complaints.insertOne(newComplaint);
+  res.send(result);
+});
+
+app.get('/complaints', async (req, res) => {
+  const result = await complaints.find().toArray();
+  res.send(result);
+});
 
 // user data stored
 app.post('/users', async (req, res) => {
@@ -45,6 +65,15 @@ app.post('/users', async (req, res) => {
 });
 //  get all users data
 app.get('/users', async (req, res) => {
+  let query = {};
+  if (req.query.email) {
+    query = { email: req.query.email };
+  }
+  const result = await users.findOne(query);
+  res.send(result);
+});
+
+app.get('/all-users', async (req, res) => {
   const result = await users.find().toArray();
   res.send(result);
 });
@@ -63,6 +92,24 @@ app.get('/agreements', async (req, res) => {
 app.get('/apartments', async (req, res) => {
   const result = await apartments.find().toArray();
   res.send(result);
+});
+
+app.get('/all-apartments', async (req, res) => {
+  const query = req.query;
+  const page = query.page;
+  const pageNumber = parseInt(page);
+  const perPage = 6;
+  const skip = pageNumber * perPage;
+
+  try {
+    const result = await apartments.find().skip(skip).limit(perPage).toArray();
+    const count = await apartments.countDocuments();
+
+    res.send({ result, count });
+  } catch (error) {
+    console.error('Error retrieving apartments:', error);
+    res.status(500).send('Internal Server Error');
+  }
 });
 
 // get specific apartment detail
@@ -85,10 +132,10 @@ app.get('/agreements', async (req, res) => {
   const result = await agreements.find().toArray();
   res.send(result);
 });
+
 // delete apartment specific  by id
 app.delete('/agreements/:id', async (req, res) => {
   const id = req.params.id;
-  console.log(id);
   const query = { _id: new ObjectId(id) };
   const result = await agreements.deleteOne(query);
   res.send(result);
@@ -145,7 +192,6 @@ app.get('/dashboard/manage-coupons', async (req, res) => {
 app.post('/create-payment-intent', async (req, res) => {
   const { price } = req.body;
   const amount = parseInt(price) * 100;
-  console.log(price);
   const paymentIntent = await Stripe.paymentIntents.create({
     amount: amount,
     currency: 'usd',
@@ -167,11 +213,14 @@ app.post('/payments', async (req, res) => {
   const deletedResult = await agreements.deleteMany(query);
   res.send({ paymentResult, deletedResult });
 });
+
 // get payment data
 app.get('/payments', async (req, res) => {
-  const email = req.query.email;
-  const query = { email: email };
-  const result = await payments.find(query).toArray;
+  let query = {};
+  if (req.query.email) {
+    query = { email: req.query.email };
+  }
+  const result = await payments.find(query).toArray();
   res.send(result);
 });
 // app.get('/request-agreements', async (req, res) => {
