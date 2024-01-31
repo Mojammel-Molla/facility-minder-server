@@ -31,6 +31,7 @@ const announcements = client
   .collection('announcements');
 const coupons = client.db('facility-minderDB').collection('coupons');
 const payments = client.db('facility-minderDB').collection('payments');
+const reviews = client.db('facility-minderDB').collection('reviews');
 
 // Post Jwt token
 app.post('/jwt', async (req, res) => {
@@ -46,9 +47,21 @@ app.post('/complaints', async (req, res) => {
   const result = await complaints.insertOne(newComplaint);
   res.send(result);
 });
-
+// get complaint list
 app.get('/complaints', async (req, res) => {
   const result = await complaints.find().toArray();
+  res.send(result);
+});
+
+// Get client reviews
+app.get('/reviews', async (req, res) => {
+  const result = await reviews.find().toArray();
+  res.send(result);
+});
+
+app.post('/reviews', async (req, res) => {
+  const newReview = req.body;
+  const result = await reviews.insertOne(newReview);
   res.send(result);
 });
 
@@ -98,7 +111,7 @@ app.get('/all-apartments', async (req, res) => {
   const query = req.query;
   const page = query.page;
   const pageNumber = parseInt(page);
-  const perPage = 6;
+  const perPage = 8;
   const skip = pageNumber * perPage;
 
   try {
