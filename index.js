@@ -35,13 +35,13 @@ const reviews = client.db('facility-minderDB').collection('reviews');
 const blogs = client.db('facility-minderDB').collection('blogs');
 
 // Post Jwt token
-// app.post('/jwt', async (req, res) => {
-//   const user = req.body;
-//   const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-//     expiresIn: '1hr',
-//   });
-//   res.send({ success: true });
-// });
+app.post('/jwt', async (req, res) => {
+  const user = req.body;
+  const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+    expiresIn: '1hr',
+  });
+  res.send({ success: true });
+});
 // post members complaint to the admin
 app.post('/complaints', async (req, res) => {
   const newComplaint = req.body;
@@ -60,6 +60,12 @@ app.get('/reviews', async (req, res) => {
   res.send(result);
 });
 
+// // post client reviews
+// app.post('/reviews', async (req, res) => {
+//   const newReview = req.body;
+//   const result = await reviews.insertOne(newReview);
+//   res.send(result);
+// });
 // post client reviews
 app.post('/reviews', async (req, res) => {
   const newReview = req.body;
